@@ -17,20 +17,20 @@ loss_fn = nn.MSELoss()
 
 
 
-# epochs = 50
-# model.train()
-# for epoch in range(epochs):
-#     total_loss = 0
-#     for xb, yb in train_loader:
-#         pred = model(xb)
-#         loss = loss_fn(pred, yb)
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-#         total_loss += loss.item()
-#     print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}")
-#     print("Saving model...")
-#     torch.save(model.state_dict(), 'transformer_model.pth')
+epochs = 50
+model.train()
+for epoch in range(epochs):
+    total_loss = 0
+    for xb, yb in train_loader:
+        pred = model(xb)
+        loss = loss_fn(pred, yb)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}")
+    print("Saving model...")
+    torch.save(model.state_dict(), 'transformer_model.pth')
 
 model.eval()
 with torch.no_grad():
