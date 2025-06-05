@@ -1,112 +1,125 @@
 # entrenamiento.py
 
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, create_sequences, device, X_tensor, y_tensor, df
+from modelo import(TransformerModel,seq_len,features,target,scaler_x,scaler_y,X_tensor,y_tensor,device,train_data_gen,test_data_gen,df)
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelEncoder
 
-# Parámetros
-batch_size = 8
+
+
+xb, yb = train_data_gen[0]
+print("Shape de xb:", xb.shape)
+print("Features:", features)
+print("Primeras filas de df[features]:\n", df[features].head())
+
+
+
+# Inicializar el modelo
+input_dim = train_data_gen[0][0].shape[2]  # [batch, seq_len, features]
+model = TransformerModel(input_dim=input_dim).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+loss_fn = nn.MSELoss()
+
 epochs = 2
-learning_rate = 0.001
 
-# Dataset y DataLoader
-dataset = TensorDataset(X_tensor, y_tensor)
-train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-# Modelo
-model = TransformerModel(input_dim=len(features)).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-loss_fn = torch.nn.MSELoss()
-
-# Entrenamiento
-model.train()
 for epoch in range(epochs):
+    model.train()
     total_loss = 0
-    for xb, yb in train_loader:
-        xb, yb = xb.to(device), yb.to(device)
-        optimizer.zero_grad()
-        pred = model(xb)
-        loss = loss_fn(pred, yb)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-        del xb, yb, pred
-        torch.cuda.empty_cache()
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}")
+    for xb, yb in train_data_gen:
+        if xb.shape[0] == 0 or xb.shape[2] == 0:
+            continue  # Salta batches vacíos o con 0 features
+    xb = torch.tensor(xb, dtype=torch.float32).to(device)
+    yb = torch.tensor(yb, dtype=torch.float32).to(device)
+    optimizer.zero_grad()
+    output = model(xb)
+    loss = loss_fn(output, yb)
+    loss.backward()
+    optimizer.step()
+    total_loss += loss.item()
+    avg_loss = total_loss / len(train_data_gen)
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
 
-# Guardar modelo
+# Evaluación en test
+model.eval()
+
+preds, trues = [], []
+with torch.no_grad():
+    for xb, yb in test_data_gen:
+        xb = torch.tensor(xb, dtype=torch.float32).to(device)
+        yb = torch.tensor(yb, dtype=torch.float32).to(device)
+        output = model(xb)
+        preds.append(output.cpu().numpy())
+        trues.append(yb.cpu().numpy())
+
+preds = np.vstack(preds)
+trues = np.vstack(trues)
+
+# Invertir el escalado para obtener valores reales
+preds_inv = scaler_y.inverse_transform(preds)
+trues_inv = scaler_y.inverse_transform(trues)
+
+rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
+print(f"Test RMSE: {rmse:.2f}")
+
 torch.save(model.state_dict(), 'transformer_model.pth')
 
-# Función de predicción para un producto específico
-def predecir_producto(producto_id: str):
-    from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, create_sequences, device, df
 
-    # Codificación de productos
-    le = LabelEncoder()
-    df['Product_encoded'] = le.fit_transform(df['Product ID'])
+def predecir_futuro_producto(
+    producto_id: str,
+    fecha_inicio: str,
+    pasos: int,
+    frecuencia: str = "D"  # "D"=día, "H"=hora, "W"=semana, "M"=mes
+):
+    
+    from modelo import df, features, scaler_x, scaler_y, seq_len
+    import pandas as pd
 
-    if producto_id not in df['Product ID'].unique():
-        print(f"Producto '{producto_id}' no encontrado en el dataset.")
-        return None, None
+    # Filtrar el historial del producto
+    df_producto = df[df['Product_encoded'] == df[df['Product ID'] == producto_id]['Product_encoded'].iloc[0]].copy()
+    df_producto = df_producto.sort_values('Date')
 
-    # Filtrar y preparar
-    df_producto = df[df['Product ID'] == producto_id].copy()
-    df_producto['Product_encoded'] = le.transform(df_producto['Product ID'])
+    # Tomar la última secuencia conocida
+    X_hist = df_producto[features].values
+    X_hist_scaled = scaler_x.transform(X_hist)
+    secuencia = X_hist_scaled[-seq_len:]  # [seq_len, features]
 
-    X_scaled = scaler_x.transform(df_producto[features])
-    y_scaled = scaler_y.transform(df_producto[target])
-    X_seq, y_seq = create_sequences(X_scaled, y_scaled, seq_len)
+    # Generar fechas futuras
+    fecha_inicio_dt = pd.to_datetime(fecha_inicio)
+    fechas_futuras = pd.date_range(start=fecha_inicio_dt, periods=pasos, freq=frecuencia)
 
-    if len(X_seq) == 0:
-        print(f"No hay suficientes datos para el producto '{producto_id}'.")
-        return None, None
+    predicciones = []
+    for fecha in fechas_futuras:
+        # Crear input para el modelo
+        nueva_fila = df_producto.iloc[-1].copy()
+        nueva_fila['Date'] = fecha.timestamp()
+        # Puedes ajustar aquí otras features si tienes lógica para ello (ej: precio futuro)
+        nueva_fila['Demand Forecast'] = 0  # Placeholder, no se usa como input real
 
-    X_tensor = torch.tensor(X_seq, dtype=torch.float32).to(device)
-    y_tensor = torch.tensor(y_seq, dtype=torch.float32).to(device)
+        # Codificar y escalar la nueva fila
+        X_nueva = nueva_fila[features].values.reshape(1, -1)
+        X_nueva_scaled = scaler_x.transform(X_nueva)
 
-    # Cargar modelo
-    model = TransformerModel(input_dim=len(features)).to(device)
-    model.load_state_dict(torch.load('transformer_model.pth', map_location=device))
-    model.eval()
+        # Construir la secuencia para el modelo
+        secuencia = np.vstack([secuencia[1:], X_nueva_scaled])  # Desplazar ventana
+        input_modelo = torch.tensor(secuencia[np.newaxis, :, :], dtype=torch.float32).to(device)  # [1, seq_len, features]
 
-    # Predicción
-    preds, trues = [], []
-    with torch.no_grad():
-        for i in range(0, len(X_tensor), batch_size):
-            xb = X_tensor[i:i+batch_size]
-            yb = y_tensor[i:i+batch_size]
-            output = model(xb).cpu().numpy()
-            preds.append(output)
-            trues.append(yb.cpu().numpy())
-            del xb, yb
-            torch.cuda.empty_cache()
+        # Predecir
+        with torch.no_grad():
+            pred_scaled = model(input_modelo).cpu().numpy()
+        pred = scaler_y.inverse_transform(pred_scaled)[0, 0]
+        predicciones.append((fecha, pred))
 
-    predictions = np.vstack(preds)
-    true_vals = np.vstack(trues)
+        # Actualizar la secuencia con la predicción (si quieres usar la predicción como input)
+        secuencia[-1, features.index('Demand Forecast')] = scaler_y.transform([[pred]])[0, 0]
 
-    predicted_units = scaler_y.inverse_transform(predictions)
-    true_units = scaler_y.inverse_transform(true_vals)
+    # Mostrar resultados
+    for fecha, pred in predicciones:
+        print(f"{fecha.strftime('%Y-%m-%d')}: Predicción demanda = {pred:.2f}")
 
-    # Gráfico
-    plt.figure(figsize=(12, 5))
-    plt.plot(df_producto['Date'].values[seq_len:], true_units, label='Real')
-    plt.plot(df_producto['Date'].values[seq_len:], predicted_units, label='Predicción')
-    plt.title(f"Predicción de demanda - Producto {producto_id}")
-    plt.xlabel("Fecha")
-    plt.ylabel("Inventario estimado")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-    return predicted_units, true_units
-
-# Ejemplo de uso
-if __name__ == "__main__":
-    predicciones, reales = predecir_producto("1")
-    if predicciones is not None and reales is not None:
-        print("Ejemplo de predicción vs real:")
-        print("Pred:", predicciones.flatten()[:5])
-        print("Real:", reales.flatten()[:5])
+    return predicciones

@@ -1,9 +1,12 @@
-from entrenar import predecir_producto
-# Ejemplo de uso
+from entrenar import predecir_futuro_producto
 
 if __name__ == "__main__":
-    predicciones, reales = predecir_producto("1")
-    if predicciones is not None and reales is not None:
+    producto_id = "P0011"
+    fecha_especifica = "2023-12-25"  # Fecha que quieres predecir
+    paso=7
+    frecuencia="D"
+    predicciones, reales = predecir_futuro_producto(producto_id, fecha_especifica, paso, frecuencia)
+    if predicciones is not None:
         print("Ejemplo de predicción vs real:")
         print("Pred:", predicciones.flatten()[:5])
         print("Real:", reales.flatten()[:5])
