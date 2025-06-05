@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, train_data_gen, test_data_gen, device
+from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, train_data_gen, test_data_gen, device, df
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -35,11 +35,16 @@ loss_fn = nn.MSELoss()
 
 epochs = 2
 
+train_losses = []
+train_rmses = []
+test_rmses = []
+
 
 for epoch in range(epochs):
     model.train()
     total_loss = 0
     preds_all, trues_all = [], []
+
     for xb, yb in train_loader:
         xb, yb = xb.to(device), yb.to(device)
         optimizer.zero_grad()
@@ -51,30 +56,71 @@ for epoch in range(epochs):
         preds_all.append(out.detach().cpu().numpy())
         trues_all.append(yb.detach().cpu().numpy())
 
-    train_preds = np.vstack(preds_all)
-    train_trues = np.vstack(trues_all)
-    train_preds_inv = scaler_y.inverse_transform(train_preds)
-    train_trues_inv = scaler_y.inverse_transform(train_trues)
-    train_rmse = np.sqrt(mean_squared_error(train_trues_inv, train_preds_inv))
-    print(f"Epoch {epoch+1}: Loss {total_loss:.4f} | Train RMSE: {train_rmse:.2f}")
+    avg_loss = total_loss / len(train_loader)
+
+    # RMSE entrenamiento
+    preds_all = np.vstack(preds_all)
+    trues_all = np.vstack(trues_all)
+    train_rmse = np.sqrt(mean_squared_error(trues_all, preds_all))
 
     # Evaluación en test
     model.eval()
-    preds, trues = [], []
+    preds_test, trues_test = [], []
     with torch.no_grad():
         for xb, yb in test_data_gen:
             xb = torch.tensor(xb, dtype=torch.float32).to(device)
             yb = torch.tensor(yb, dtype=torch.float32).to(device)
             output = model(xb)
-            preds.append(output.cpu().numpy())
-            trues.append(yb.cpu().numpy())
-    preds = np.vstack(preds)
-    trues = np.vstack(trues)
-    preds_inv = scaler_y.inverse_transform(preds)
-    trues_inv = scaler_y.inverse_transform(trues)
-    test_rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
+            preds_test.append(output.cpu().numpy())
+            trues_test.append(yb.cpu().numpy())
+
+    preds_test = np.vstack(preds_test)
+    trues_test = np.vstack(trues_test)
+
+    # Invertir escalado para obtener RMSE real
+    preds_test_inv = scaler_y.inverse_transform(preds_test)
+    trues_test_inv = scaler_y.inverse_transform(trues_test)
+    test_rmse = np.sqrt(mean_squared_error(trues_test_inv, preds_test_inv))
+
+    # Guardar métricas
+    train_losses.append(avg_loss)
+    train_rmses.append(train_rmse)
+    test_rmses.append(test_rmse)
 
     print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
+
+
+
+    # Evaluación en test
+    model.eval()
+   
+epochs_range = range(1, epochs + 1)
+
+plt.figure(figsize=(12, 5))
+
+# Loss
+plt.subplot(1, 3, 1)
+plt.plot(epochs_range, train_losses, marker='o', color='blue')
+plt.title('Train Loss por Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+
+# Train RMSE
+plt.subplot(1, 3, 2)
+plt.plot(epochs_range, train_rmses, marker='o', color='green')
+plt.title('Train RMSE por Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('RMSE')
+
+# Test RMSE
+plt.subplot(1, 3, 3)
+plt.plot(epochs_range, test_rmses, marker='o', color='red')
+plt.title('Test RMSE por Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('RMSE')
+
+plt.tight_layout()
+plt.show()
 
 torch.save(model.state_dict(), 'transformer_model.pth')
 
