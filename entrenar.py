@@ -17,10 +17,20 @@ print("Shape de xb:", xb.shape)
 print("Features:", features)
 print("Primeras filas de df[features]:\n", df[features].head())
 
+X_train_batches = []
+y_train_batches = []
+for xb, yb in train_data_gen:
+    X_train_batches.append(xb)
+    y_train_batches.append(yb)
+X_train_tensor = torch.tensor(np.concatenate(X_train_batches), dtype=torch.float32)
+y_train_tensor = torch.tensor(np.concatenate(y_train_batches), dtype=torch.float32)
 
+
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
 # Inicializar el modelo
-input_dim = train_data_gen[0][0].shape[2]  # [batch, seq_len, features]
+input_dim = X_train_tensor.shape[2]
 model = TransformerModel(input_dim=input_dim).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
@@ -31,41 +41,44 @@ epochs = 2
 for epoch in range(epochs):
     model.train()
     total_loss = 0
-    for xb, yb in train_data_gen:
-        if xb.shape[0] == 0 or xb.shape[2] == 0:
-            continue  # Salta batches vacíos o con 0 features
-    xb = torch.tensor(xb, dtype=torch.float32).to(device)
-    yb = torch.tensor(yb, dtype=torch.float32).to(device)
-    optimizer.zero_grad()
-    output = model(xb)
-    loss = loss_fn(output, yb)
-    loss.backward()
-    optimizer.step()
-    total_loss += loss.item()
-    avg_loss = total_loss / len(train_data_gen)
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
+    train_preds, train_trues = [], []
+    for xb, yb in train_loader:
+        xb = xb.to(device)
+        yb = yb.to(device)
+        optimizer.zero_grad()
+        output = model(xb)
+        loss = loss_fn(output, yb)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        train_preds.append(output.detach().cpu().numpy())
+        train_trues.append(yb.detach().cpu().numpy())
+    avg_loss = total_loss / len(train_loader)
+    # Calcular RMSE de entrenamiento
+    train_preds = np.vstack(train_preds)
+    train_trues = np.vstack(train_trues)
+    train_preds_inv = scaler_y.inverse_transform(train_preds)
+    train_trues_inv = scaler_y.inverse_transform(train_trues)
+    train_rmse = np.sqrt(mean_squared_error(train_trues_inv, train_preds_inv))
+
 
 # Evaluación en test
-model.eval()
+    model.eval()
+    preds, trues = [], []
+    with torch.no_grad():
+        for xb, yb in test_data_gen:
+            xb = torch.tensor(xb, dtype=torch.float32).to(device)
+            yb = torch.tensor(yb, dtype=torch.float32).to(device)
+            output = model(xb)
+            preds.append(output.cpu().numpy())
+            trues.append(yb.cpu().numpy())
+    preds = np.vstack(preds)
+    trues = np.vstack(trues)
+    preds_inv = scaler_y.inverse_transform(preds)
+    trues_inv = scaler_y.inverse_transform(trues)
+    test_rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
 
-preds, trues = [], []
-with torch.no_grad():
-    for xb, yb in test_data_gen:
-        xb = torch.tensor(xb, dtype=torch.float32).to(device)
-        yb = torch.tensor(yb, dtype=torch.float32).to(device)
-        output = model(xb)
-        preds.append(output.cpu().numpy())
-        trues.append(yb.cpu().numpy())
-
-preds = np.vstack(preds)
-trues = np.vstack(trues)
-
-# Invertir el escalado para obtener valores reales
-preds_inv = scaler_y.inverse_transform(preds)
-trues_inv = scaler_y.inverse_transform(trues)
-
-rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
-print(f"Test RMSE: {rmse:.2f}")
+    print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
 
 torch.save(model.state_dict(), 'transformer_model.pth')
 
