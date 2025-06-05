@@ -27,7 +27,7 @@ y_train_tensor = torch.tensor(np.concatenate(y_train_batches), dtype=torch.float
 
 
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 
 # Inicializar el modelo
 input_dim = X_train_tensor.shape[2]
@@ -82,14 +82,19 @@ def predecir_futuro_producto(
     producto_id: str,
     fecha_inicio: str,
     pasos: int,
-    frecuencia: str = "D"  # "D"=día, "H"=hora, "W"=semana, "M"=mes
+    frecuencia: str  # "D"=día, "H"=hora, "W"=semana, "M"=mes
 ):
     
     from modelo import df, features, scaler_x, scaler_y, seq_len
     import pandas as pd
 
     # Filtrar el historial del producto
-    df_producto = df[df['Product_encoded'] == df[df['Product ID'] == producto_id]['Product_encoded'].iloc[0]].copy()
+    producto_mask = df['Product ID'] == producto_id
+    if not producto_mask.any():
+        print(f"Producto {producto_id} no encontrado.")
+        return []
+    prod_encoded = df.loc[producto_mask, 'Product_encoded'].iloc[0]
+    df_producto = df[df['Product_encoded'] == prod_encoded].copy()
     df_producto = df_producto.sort_values('Date')
 
     # Tomar la última secuencia conocida
@@ -107,7 +112,7 @@ def predecir_futuro_producto(
         nueva_fila = df_producto.iloc[-1].copy()
         nueva_fila['Date'] = fecha.timestamp()
         # Puedes ajustar aquí otras features si tienes lógica para ello (ej: precio futuro)
-        nueva_fila['Demand Forecast'] = 0  # Placeholder, no se usa como input real
+        nueva_fila['Units Sold'] = 0  # Placeholder, no se usa como input real
 
         # Codificar y escalar la nueva fila
         X_nueva = nueva_fila[features].values.reshape(1, -1)
@@ -124,7 +129,7 @@ def predecir_futuro_producto(
         predicciones.append((fecha, pred))
 
         # Actualizar la secuencia con la predicción (si quieres usar la predicción como input)
-        secuencia[-1, features.index('Demand Forecast')] = scaler_y.transform([[pred]])[0, 0]
+        secuencia[-1, features.index('Units Sold')] = scaler_y.transform([[pred]])[0, 0]
 
     # Mostrar resultados
     for fecha, pred in predicciones:
