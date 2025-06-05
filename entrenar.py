@@ -30,10 +30,11 @@ train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 
 # Inicializar el modelo
-input_dim = X_train_tensor.shape[2]
+input_dim = train_data_gen[0][0].shape[2]
 model = TransformerModel(input_dim=input_dim).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
+
 
 epochs = 2
 
@@ -41,17 +42,45 @@ epochs = 2
 for epoch in range(epochs):
     model.train()
     total_loss = 0
-    for xb, yb in train_loader:
-        xb = xb.to(device)
-        yb = yb.to(device)
+    train_preds, train_trues = [], []
+    for xb, yb in train_data_gen:
+        xb = torch.tensor(xb, dtype=torch.float32).to(device)
+        yb = torch.tensor(yb, dtype=torch.float32).to(device)
         optimizer.zero_grad()
         output = model(xb)
         loss = loss_fn(output, yb)
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-    avg_loss = total_loss / len(train_loader)
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
+        train_preds.append(output.detach().cpu().numpy())
+        train_trues.append(yb.detach().cpu().numpy())
+    avg_loss = total_loss / len(train_data_gen)
+    # Calcular RMSE de entrenamiento
+    train_preds = np.vstack(train_preds)
+    train_trues = np.vstack(train_trues)
+    train_preds_inv = scaler_y.inverse_transform(train_preds)
+    train_trues_inv = scaler_y.inverse_transform(train_trues)
+    train_rmse = np.sqrt(mean_squared_error(train_trues_inv, train_preds_inv))
+
+    # Evaluación en test
+    model.eval()
+    preds, trues = [], []
+    with torch.no_grad():
+        for xb, yb in test_data_gen:
+            xb = torch.tensor(xb, dtype=torch.float32).to(device)
+            yb = torch.tensor(yb, dtype=torch.float32).to(device)
+            output = model(xb)
+            preds.append(output.cpu().numpy())
+            trues.append(yb.cpu().numpy())
+    preds = np.vstack(preds)
+    trues = np.vstack(trues)
+    preds_inv = scaler_y.inverse_transform(preds)
+    trues_inv = scaler_y.inverse_transform(trues)
+    test_rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
+
+    print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
+
+torch.save(model.state_dict(), 'transformer_model.pth')
 
 # Evaluación en test
 model.eval()
@@ -75,7 +104,7 @@ trues_inv = scaler_y.inverse_transform(trues)
 rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
 print(f"Test RMSE: {rmse:.2f}")
 
-torch.save(model.state_dict(), 'transformer_model.pth')
+
 
 
 def predecir_futuro_producto(
@@ -84,10 +113,6 @@ def predecir_futuro_producto(
     pasos: int,
     frecuencia: str  # "D"=día, "H"=hora, "W"=semana, "M"=mes
 ):
-    
-    from modelo import df, features, scaler_x, scaler_y, seq_len
-    import pandas as pd
-
     # Filtrar el historial del producto
     producto_mask = df['Product ID'] == producto_id
     if not producto_mask.any():
@@ -108,30 +133,26 @@ def predecir_futuro_producto(
 
     predicciones = []
     for fecha in fechas_futuras:
-        # Crear input para el modelo
         nueva_fila = df_producto.iloc[-1].copy()
         nueva_fila['Date'] = fecha.timestamp()
         # Puedes ajustar aquí otras features si tienes lógica para ello (ej: precio futuro)
-        nueva_fila['Units Sold'] = 0  # Placeholder, no se usa como input real
+        nueva_fila['Units Sold'] = 0  # Placeholder
 
-        # Codificar y escalar la nueva fila
         X_nueva = nueva_fila[features].values.reshape(1, -1)
         X_nueva_scaled = scaler_x.transform(X_nueva)
 
-        # Construir la secuencia para el modelo
-        secuencia = np.vstack([secuencia[1:], X_nueva_scaled])  # Desplazar ventana
-        input_modelo = torch.tensor(secuencia[np.newaxis, :, :], dtype=torch.float32).to(device)  # [1, seq_len, features]
+        # Desplazar ventana
+        secuencia = np.vstack([secuencia[1:], X_nueva_scaled])
+        input_modelo = torch.tensor(secuencia[np.newaxis, :, :], dtype=torch.float32).to(device)
 
-        # Predecir
         with torch.no_grad():
             pred_scaled = model(input_modelo).cpu().numpy()
         pred = scaler_y.inverse_transform(pred_scaled)[0, 0]
         predicciones.append((fecha, pred))
 
-        # Actualizar la secuencia con la predicción (si quieres usar la predicción como input)
-        secuencia[-1, features.index('Units Sold')] = scaler_y.transform([[pred]])[0, 0]
+        # Si quieres usar la predicción como input, descomenta la siguiente línea:
+        # secuencia[-1, features.index('Units Sold')] = scaler_y.transform([[pred]])[0, 0]
 
-    # Mostrar resultados
     for fecha, pred in predicciones:
         print(f"{fecha.strftime('%Y-%m-%d')}: Predicción demanda = {pred:.2f}")
 
