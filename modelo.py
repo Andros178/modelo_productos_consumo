@@ -40,10 +40,11 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 # df = df.sort_values(by='fecha_Inicio')
 
 
-
+producto_id = "P0001"
 # Dataset
 df = pd.read_csv('Dataset/retail_store_inventory.csv')
 #df['fecha_Inicio'] = pd.to_datetime(df['fecha_Inicio'])
+df = df[df['Product ID'] == producto_id].copy()
 
 le = LabelEncoder()
 df['Product_encoded'] = le.fit_transform(df['Product ID'])
@@ -51,8 +52,8 @@ df['Product_encoded'] = le.fit_transform(df['Product ID'])
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
 
-features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date','Demand Forecast']  # Añadir 'Date' como feature
-target = ['Demand Forecast']
+features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date']  # Añadir 'Date' como feature
+target = ['Units Sold']
 
 
 scaler_x = MinMaxScaler()

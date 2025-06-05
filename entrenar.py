@@ -41,7 +41,6 @@ epochs = 2
 for epoch in range(epochs):
     model.train()
     total_loss = 0
-    train_preds, train_trues = [], []
     for xb, yb in train_loader:
         xb = xb.to(device)
         yb = yb.to(device)
@@ -51,34 +50,30 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-        train_preds.append(output.detach().cpu().numpy())
-        train_trues.append(yb.detach().cpu().numpy())
     avg_loss = total_loss / len(train_loader)
-    # Calcular RMSE de entrenamiento
-    train_preds = np.vstack(train_preds)
-    train_trues = np.vstack(train_trues)
-    train_preds_inv = scaler_y.inverse_transform(train_preds)
-    train_trues_inv = scaler_y.inverse_transform(train_trues)
-    train_rmse = np.sqrt(mean_squared_error(train_trues_inv, train_preds_inv))
-
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
 
 # Evaluación en test
-    model.eval()
-    preds, trues = [], []
-    with torch.no_grad():
-        for xb, yb in test_data_gen:
-            xb = torch.tensor(xb, dtype=torch.float32).to(device)
-            yb = torch.tensor(yb, dtype=torch.float32).to(device)
-            output = model(xb)
-            preds.append(output.cpu().numpy())
-            trues.append(yb.cpu().numpy())
-    preds = np.vstack(preds)
-    trues = np.vstack(trues)
-    preds_inv = scaler_y.inverse_transform(preds)
-    trues_inv = scaler_y.inverse_transform(trues)
-    test_rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
+model.eval()
 
-    print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
+preds, trues = [], []
+with torch.no_grad():
+    for xb, yb in test_data_gen:
+        xb = torch.tensor(xb, dtype=torch.float32).to(device)
+        yb = torch.tensor(yb, dtype=torch.float32).to(device)
+        output = model(xb)
+        preds.append(output.cpu().numpy())
+        trues.append(yb.cpu().numpy())
+
+preds = np.vstack(preds)
+trues = np.vstack(trues)
+
+# Invertir el escalado para obtener valores reales
+preds_inv = scaler_y.inverse_transform(preds)
+trues_inv = scaler_y.inverse_transform(trues)
+
+rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
+print(f"Test RMSE: {rmse:.2f}")
 
 torch.save(model.state_dict(), 'transformer_model.pth')
 
