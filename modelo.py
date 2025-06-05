@@ -40,9 +40,10 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 # df = df.sort_values(by='fecha_Inicio')
 
 
-producto_id = "P0001"
+
 # Dataset
 df = pd.read_csv('Dataset/retail_store_inventory.csv')
+producto_id = "P0001"
 #df['fecha_Inicio'] = pd.to_datetime(df['fecha_Inicio'])
 df = df[df['Product ID'] == producto_id].copy()
 
@@ -68,13 +69,13 @@ if y_scaled.ndim == 1:
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-seq_len = 7
+seq_len = 14
 train_size = int(len(df)*0.82)
 X_train, X_test = X_scaled[:train_size],X_scaled[train_size:]
 y_train, y_test = y_scaled[:train_size],y_scaled[train_size:]
 
-train_data_gen = TimeseriesGenerator(X_train, y_train, length=seq_len, batch_size=32)
-test_data_gen = TimeseriesGenerator(X_test, y_test, length=seq_len, batch_size=32)
+train_data_gen = TimeseriesGenerator(X_train, y_train, length=seq_len, batch_size=8)
+test_data_gen = TimeseriesGenerator(X_test, y_test, length=seq_len, batch_size=8)
 
 
 X_seq, y_seq = train_data_gen[0]
