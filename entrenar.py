@@ -5,10 +5,10 @@ from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import mean_squared_error
+import pandas as pd
 
 # Mostrar info de features
-xb, yb = train_data_gen[0]
-print("Shape de xb:", xb.shape)
+
 print("Features:", features)
 print("Primeras filas de df[features]:\n", df[features].head())
 
@@ -110,27 +110,20 @@ trues_inv = scaler_y.inverse_transform(trues)
 rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
 print(f"Test RMSE: {rmse:.2f}")
 
-def predecir_futuro_producto(
-    producto_id: str,
-    fecha_inicio: str,
-    pasos: int,
-    frecuencia: str  # "D"=día, "H"=hora, "W"=semana, "M"=mes
-):
-    # Filtrar el historial del producto
+def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
     producto_mask = df['Product ID'] == producto_id
     if not producto_mask.any():
         print(f"Producto {producto_id} no encontrado.")
-        return []
+        return np.array([]), None
     prod_encoded = df.loc[producto_mask, 'Product_encoded'].iloc[0]
     df_producto = df[df['Product_encoded'] == prod_encoded].copy()
     df_producto = df_producto.sort_values('Date')
 
-    # Tomar la última secuencia conocida
     X_hist = df_producto[features].values
     X_hist_scaled = scaler_x.transform(X_hist)
     secuencia = X_hist_scaled[-seq_len:]  # [seq_len, features]
 
-    # Generar fechas futuras
+    import pandas as pd
     fecha_inicio_dt = pd.to_datetime(fecha_inicio)
     fechas_futuras = pd.date_range(start=fecha_inicio_dt, periods=pasos, freq=frecuencia)
 
@@ -138,25 +131,48 @@ def predecir_futuro_producto(
     for fecha in fechas_futuras:
         nueva_fila = df_producto.iloc[-1].copy()
         nueva_fila['Date'] = fecha.timestamp()
-        # Puedes ajustar aquí otras features si tienes lógica para ello (ej: precio futuro)
         nueva_fila['Units Sold'] = 0  # Placeholder
-
-        X_nueva = nueva_fila[features].values.reshape(1, -1)
+        X_nueva = pd.DataFrame([nueva_fila[features].values], columns=features)
         X_nueva_scaled = scaler_x.transform(X_nueva)
-
-        # Desplazar ventana
         secuencia = np.vstack([secuencia[1:], X_nueva_scaled])
         input_modelo = torch.tensor(secuencia[np.newaxis, :, :], dtype=torch.float32).to(device)
-
         with torch.no_grad():
             pred_scaled = model(input_modelo).cpu().numpy()
         pred = scaler_y.inverse_transform(pred_scaled)[0, 0]
-        predicciones.append((fecha, pred))
+        predicciones.append(pred)
+        # secuencia[-1, features.index('Units Sold')] = scaler_y.transform([[pred]])[0, 0]  # Si quieres usar la predicción como input
 
-        # Si quieres usar la predicción como input, descomenta la siguiente línea:
-        # secuencia[-1, features.index('Units Sold')] = scaler_y.transform([[pred]])[0, 0]
+    return np.array(predicciones), None  # No hay reales para el futuro
 
-    for fecha, pred in predicciones:
-        print(f"{fecha.strftime('%Y-%m-%d')}: Predicción demanda = {pred:.2f}")
+# Uso en main:
 
-    return predicciones
+from modelo import producto_id
+if __name__ == "__main__":
+    producto_id = producto_id
+    fecha_inicio = "2023-12-25"
+    paso = 7
+    frecuencia = "D"
+    predicciones, _ = predecir_futuro_producto(producto_id, fecha_inicio, paso, frecuencia)
+    if predicciones is not None:
+        print("Pred:", predicciones.flatten()[:5])
+
+        # Obtener el último Inventory Level real del producto
+        df_producto = df[df['Product ID'] == producto_id].copy()
+        df_producto = df_producto.sort_values('Date')
+        ultimo_inventory = df_producto['Inventory Level'].iloc[-1]
+
+        # Fechas para el eje x
+        fechas_futuras = pd.date_range(start=fecha_inicio, periods=paso, freq=frecuencia)
+
+        # Graficar
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(10, 5))
+        plt.plot(fechas_futuras, predicciones, marker='o', label='Predicción Units Sold')
+        plt.axhline(ultimo_inventory, color='red', linestyle='--', label='Inventory Level actual')
+        plt.title(f'Predicción de ventas futuras vs Inventory Level actual\nProducto: {producto_id}')
+        plt.xlabel('Fecha')
+        plt.ylabel('Unidades')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
