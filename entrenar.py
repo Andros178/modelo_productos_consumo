@@ -24,7 +24,7 @@ model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
 
-epochs = 2
+epochs = 1500
 train_losses, train_rmses, test_rmses = [], [], []
 
 for epoch in range(epochs):
@@ -125,7 +125,7 @@ def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
 
     import pandas as pd
     fecha_inicio_dt = pd.to_datetime(fecha_inicio)
-    fechas_futuras = pd.date_range(start=fecha_inicio_dt, periods=pasos, freq=frecuencia)
+    fechas_futuras = pd.date_range(start=fecha_inicio_dt+pd.Timedelta(days=1), periods=pasos, freq=frecuencia)
 
     predicciones = []
     for fecha in fechas_futuras:
@@ -145,19 +145,37 @@ def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
 
 from modelo import producto_id
 if __name__ == "__main__":
-    
-    producto_id = producto_id
-    fecha_inicio = "2023-12-25"
-    paso = 7
+    from datetime import datetime, timedelta
+    producto_id = "P0001"
+    fecha_inicio = "2022-01-01"
+    fecha_inicio = pd.to_datetime(fecha_inicio)
+    paso = 15
     frecuencia = "D"
-    predicciones, _ = predecir_futuro_producto(producto_id, fecha_inicio, paso, frecuencia)
+    
+    
+    
+    if frecuencia == "D":
+        predicciones, _ = predecir_futuro_producto(producto_id, fecha_inicio+timedelta(days=1), paso, frecuencia)
+    if frecuencia == "M":
+        predicciones, _ = predecir_futuro_producto(producto_id, fecha_inicio+timedelta(months=1), paso, frecuencia)
+    if frecuencia == "Y":
+        predicciones, _ = predecir_futuro_producto(producto_id, fecha_inicio+timedelta(years=1), paso, frecuencia)
     if predicciones is not None:
         print("Pred:", predicciones.flatten()[:5])
 
         # Obtener el último Inventory Level real del producto
         df_producto = df[df['Product ID'] == producto_id].copy()
         df_producto = df_producto.sort_values('Date')
-        ultimo_inventory = df_producto['Inventory Level'].iloc[-1]
+        tolerancia = 1
+        fecha_ts = fecha_inicio.timestamp()
+        
+        mask = ( (df['Product ID'] == producto_id) & (df['Date'] >= fecha_ts - tolerancia) & (df['Date'] <= fecha_ts + tolerancia)
+        )
+        
+        ultimo_inventory = df.loc[mask, 'Inventory Level']
+
+        if not ultimo_inventory.empty:
+            ultimo_inventory = ultimo_inventory.iloc[0]
 
         fechas_futuras = pd.date_range(start=fecha_inicio, periods=paso, freq=frecuencia)
 
@@ -166,52 +184,114 @@ if __name__ == "__main__":
         necesidad = []
         umbral = 10
         notificado = False
-        alerta_fecha = None  # Guardar la fecha de la alerta
+        alerta_fecha = None  
 
         inventario = [ultimo_inventory]
         necesidad = []
         for fecha, pred in zip(fechas_futuras, predicciones):
             nuevo_inv = inventario[-1] - pred
             inventario.append(nuevo_inv)
-            necesidad.append(max(0, -nuevo_inv))
+            sobrante = nuevo_inv - umbral
+            if sobrante > 0:
+                necesidad.append(0)
+            else:
+                necesidad.append(sobrante)
+
+            
             if not notificado and nuevo_inv <= umbral:
                 print(f"¡ALERTA! El {fecha.strftime('%Y-%m-%d')} el inventario proyectado baja al umbral ({nuevo_inv:.0f} unidades). ¡Debe reabastecer!")
                 alerta_fecha = fecha
                 notificado = True
+        import time
+        import datetime
+        
+        
 
-        inventario = inventario[1:]  # Quitar el inventario inicial para alinear con fechas
+        print("inventario nuevo",nuevo_inv.shape)
 
-        # Graficar
+        print("necesidad len", len(necesidad))
+
+        print("inventario", len(inventario))
+        
+
+
         plt.figure(figsize=(12, 6))
-        bars = plt.bar(fechas_futuras, inventario, color='orange', alpha=0.6, label='Inventory Level proyectado')
-        line, = plt.plot(fechas_futuras, predicciones, marker='o', color='blue', label='Predicción Units Sold')
-        bars_nec = plt.bar(fechas_futuras, necesidad, color='red', alpha=0.4, label='Necesidad (faltante)', bottom=[min(0, inv) for inv in inventario])
-        plt.axhline(0, color='black', linestyle='--', linewidth=1)
-        plt.title(f'Predicción de ventas futuras y trazabilidad de inventario\nProducto: {producto_id}')
+        plt.bar(fechas_futuras.insert(0, fechas_futuras[0] - pd.Timedelta(days=1)), inventario, color='orange', alpha=0.6, label='Inventory Level proyectado')
+        plt.title(f'Inventario proyectado - Producto: {producto_id}')
         plt.xlabel('Fecha')
         plt.ylabel('Unidades')
-        plt.legend()
         plt.grid(True)
-        plt.tight_layout()
+        plt.legend()
 
-        # Añadir valores numéricos sobre las barras de inventario
-        for bar, valor in zip(bars, inventario):
-            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f'{valor:.0f}', 
-                    ha='center', va='bottom', fontsize=9, color='black', fontweight='bold')
+        
+        for fecha, valor in zip(fechas_futuras.insert(0, fechas_futuras[0] - pd.Timedelta(days=1)), inventario):
+            plt.text(fecha, valor, f'{valor:.0f}', ha='center', va='bottom', fontsize=9, color='black', fontweight='bold')
 
-        # Añadir valores numéricos sobre las barras de necesidad (si hay necesidad)
-        for bar, valor in zip(bars_nec, necesidad):
-            if valor > 0:
-                plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + bar.get_y(), f'{valor:.0f}',
-                        ha='center', va='bottom', fontsize=9, color='red', fontweight='bold')
+        plt.show()
 
-        # Añadir valores numéricos sobre los puntos de predicción de ventas
-        for x, y in zip(fechas_futuras, predicciones):
-            plt.text(x, y, f'{y:.0f}', ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
 
-        # Resaltar la fecha de alerta en la gráfica
+
+
+        plt.figure(figsize=(12, 6))
+
+        # Barras de predicciones (Units Sold)
+        plt.bar(fechas_futuras, predicciones, color='blue', alpha=0.6, label='Predicción Units Sold')
+
+        # Barras de necesidad (faltante)
+        plt.bar(fechas_futuras, necesidad, color='red', alpha=0.4, label='Necesidad (faltante)', bottom=0)
+
+        plt.title(f'Predicción de ventas y necesidad - Producto: {producto_id}')
+        plt.xlabel('Fecha')
+        plt.ylabel('Unidades')
+        plt.grid(True)
+        plt.legend()
+
+        # Añadir valores numéricos sobre las barras de predicción y necesidad
+        for fecha, val_pred, val_nec in zip(fechas_futuras, predicciones, necesidad):
+            plt.text(fecha, val_pred, f'{val_pred:.0f}', ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
+            if val_nec != 0:  # Mostrar solo si necesidad es negativa (déficit)
+                plt.text(fecha, val_nec, f'{val_nec:.0f}', ha='center', va='top', fontsize=9, color='red', fontweight='bold')
+        
+        
         if alerta_fecha is not None:
             plt.axvline(alerta_fecha, color='red', linestyle='--', linewidth=2, label='Fecha de alerta')
             plt.legend()
 
         plt.show()
+        
+
+        # # Graficar
+
+        # plt.figure(figsize=(12, 6))
+        # bars = plt.bar(fechas_futuras, inventario, color='orange', alpha=0.6, label='Inventory Level proyectado')
+        # line, = plt.plot(fechas_futuras, predicciones, marker='o', color='blue', label='Predicción Units Sold')
+        # bars_nec = plt.bar(fechas_futuras, necesidad, color='red', alpha=0.4, label='Necesidad (faltante)', bottom=[min(0, inv) for inv in inventario])
+        # plt.axhline(0, color='black', linestyle='--', linewidth=1)
+        # plt.title(f'Predicción de ventas futuras y trazabilidad de inventario\nProducto: {producto_id}')
+        # plt.xlabel('Fecha')
+        # plt.ylabel('Unidades')
+        # plt.legend()
+        # plt.grid(True)
+        # plt.tight_layout()
+
+        # # Añadir valores numéricos sobre las barras de inventario
+        # for bar, valor in zip(bars, inventario):
+        #     plt.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f'{valor:.0f}', 
+        #             ha='center', va='bottom', fontsize=9, color='black', fontweight='bold')
+
+        # # Añadir valores numéricos sobre las barras de necesidad (si hay necesidad)
+        # for bar, valor in zip(bars_nec, necesidad):
+        #     if valor > 0:
+        #         plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + bar.get_y(), f'{valor:.0f}',
+        #                 ha='center', va='bottom', fontsize=9, color='red', fontweight='bold')
+
+        # # Añadir valores numéricos sobre los puntos de predicción de ventas
+        # for x, y in zip(fechas_futuras, predicciones):
+        #     plt.text(x, y, f'{y:.0f}', ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
+
+        # # Resaltar la fecha de alerta en la gráfica
+        # if alerta_fecha is not None:
+        #     plt.axvline(alerta_fecha, color='red', linestyle='--', linewidth=2, label='Fecha de alerta')
+        #     plt.legend()
+
+        # plt.show()
