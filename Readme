@@ -1,0 +1,28 @@
+
+# Para la instalación de las librerias se debe de utilizar el comando
+    
+#    pip install -r requirements.txt
+
+# Se dividieron los archivos por secciones para así llevar un orden en los procesos a realizar.
+
+#Orden de ejcución:
+#   1.Dataframe.py
+#       Opcional: Grafica.py <- Para verificar la tendencia de los datos filtrados en dataframe.py
+#   2.Modelo.py
+#   3.Entrenar.py
+#   4.Predecir.py
+
+
+## En caso de querer probar el modelo ejecutar directamente el archivo "Predecir.py"
+
+#Dataframe.py:
+#   Se utiliza para prepara el dataset, esto con el objetivo de escalar el modelo para no dedicarlo a un solo producto
+
+#Modelo.py:
+#    Se realiza la modelación de los datos y la definición del modelo
+
+#Entrenar.py:
+#   Se utiliza para el entrenamiento, es el corazón del modelo y se definen los epoch
+
+#Predecir.py:
+#   Se consume el modelo creado, el repositorio ya cuenta con un modelo en caso que se quiera probar.

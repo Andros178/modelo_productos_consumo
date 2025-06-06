@@ -24,7 +24,7 @@ model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
 
-epochs = 1500
+epochs = 10
 train_losses, train_rmses, test_rmses = [], [], []
 
 for epoch in range(epochs):
@@ -89,7 +89,7 @@ plt.ylabel('RMSE')
 plt.tight_layout()
 plt.show()
 
-torch.save(model.state_dict(), 'transformer_model.pth')
+torch.save(model.state_dict(), 'Modelo.pth')
 
 # Evaluación final en test
 model.eval()
