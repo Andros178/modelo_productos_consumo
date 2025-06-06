@@ -41,48 +41,50 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 
 
 
+def create_sequences(X, y, seq_len=14):
+    Xs, ys = [], []
+    for i in range(len(X) - seq_len):
+        Xs.append(X[i:i+seq_len])
+        ys.append(y[i+seq_len])
+    return np.array(Xs), np.array(ys)
+
+
+
 # Dataset
 df = pd.read_csv('Dataset/retail_store_inventory.csv')
 producto_id = "P0001"
-#df['fecha_Inicio'] = pd.to_datetime(df['fecha_Inicio'])
 df = df[df['Product ID'] == producto_id].copy()
 
 le = LabelEncoder()
 df['Product_encoded'] = le.fit_transform(df['Product ID'])
-
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
 
-features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date']  # Añadir 'Date' como feature
+features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date']
 target = ['Units Sold']
-
 
 scaler_x = MinMaxScaler()
 scaler_y = MinMaxScaler()
 X_scaled = scaler_x.fit_transform(df[features])
 y_scaled = scaler_y.fit_transform(df[target])
-
 if y_scaled.ndim == 1:
     y_scaled = y_scaled.reshape(-1, 1)
 
-
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 seq_len = 14
-train_size = int(len(df)*0.82)
-X_train, X_test = X_scaled[:train_size],X_scaled[train_size:]
-y_train, y_test = y_scaled[:train_size],y_scaled[train_size:]
+train_size = int(len(df) * 0.82)
+X_train, X_test = X_scaled[:train_size], X_scaled[train_size:]
+y_train, y_test = y_scaled[:train_size], y_scaled[train_size:]
 
-train_data_gen = TimeseriesGenerator(X_train, y_train, length=seq_len, batch_size=8)
-test_data_gen = TimeseriesGenerator(X_test, y_test, length=seq_len, batch_size=8)
+# Crear secuencias manualmente
+X_train_seq, y_train_seq = create_sequences(X_train, y_train, seq_len)
+X_test_seq, y_test_seq = create_sequences(X_test, y_test, seq_len)
 
+X_train_tensor = torch.tensor(X_train_seq, dtype=torch.float32).to(device)
+y_train_tensor = torch.tensor(y_train_seq, dtype=torch.float32).to(device)
+X_test_tensor = torch.tensor(X_test_seq, dtype=torch.float32).to(device)
+y_test_tensor = torch.tensor(y_test_seq, dtype=torch.float32).to(device)
 
-X_seq, y_seq = train_data_gen[0]
-
-
-X_tensor = torch.tensor(X_seq, dtype=torch.float32).to(device)
-y_tensor = torch.tensor(y_seq, dtype=torch.float32).to(device)
 class TransformerModel(nn.Module):
     def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
         super().__init__()
@@ -107,15 +109,9 @@ def plot_delta(data):
     plt.show()
 
 # (Opcional) Función para crear secuencias manualmente (no necesaria si usas TimeseriesGenerator)
-def create_sequences(X, y, seq_len=14):
-    Xs, ys = [], []
-    for i in range(len(X) - seq_len):
-        Xs.append(X[i:i+seq_len])
-        ys.append(y[i+seq_len])
-    return np.array(Xs), np.array(ys)
+
 
 __all__ = [
     "TransformerModel", "seq_len", "features", "target",
-    "scaler_x", "scaler_y", "X_tensor", "y_tensor", "device",
-    "train_data_gen", "test_data_gen"
+    "scaler_x", "scaler_y", "X_train_tensor", "y_train_tensor", "X_test_tensor", "y_test_tensor", "device", "df"
 ]

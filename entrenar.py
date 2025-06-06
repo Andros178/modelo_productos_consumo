@@ -1,12 +1,9 @@
-# entrenamiento.py
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, train_data_gen, test_data_gen, device, df
+from modelo import TransformerModel, seq_len, features, target, scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from sklearn.metrics import mean_squared_error
 
 # Mostrar info de features
@@ -15,27 +12,9 @@ print("Shape de xb:", xb.shape)
 print("Features:", features)
 print("Primeras filas de df[features]:\n", df[features].head())
 
-# Prepara tensores de entrenamiento y crea DataLoader
-X_train_batches = []
-y_train_batches = []
-for xb, yb in train_data_gen:
-    X_train_batches.append(xb)
-    y_train_batches.append(yb)
-X_train_tensor = torch.tensor(np.concatenate(X_train_batches), dtype=torch.float32)
-y_train_tensor = torch.tensor(np.concatenate(y_train_batches), dtype=torch.float32)
-
+# DataLoader
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-# Prepara tensores de test y DataLoader (opcional, para evaluación final)
-X_test_batches = []
-y_test_batches = []
-for xb, yb in test_data_gen:
-    X_test_batches.append(xb)
-    y_test_batches.append(yb)
-X_test_tensor = torch.tensor(np.concatenate(X_test_batches), dtype=torch.float32)
-y_test_tensor = torch.tensor(np.concatenate(y_test_batches), dtype=torch.float32)
-
 test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
@@ -46,19 +25,13 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
 
 epochs = 2
-train_losses = []
-train_rmses = []
-test_rmses = []
+train_losses, train_rmses, test_rmses = [], [], []
 
 for epoch in range(epochs):
     model.train()
     total_loss = 0
     preds_all, trues_all = [], []
-
     for xb, yb in train_loader:
-        # Chequeo robusto para batches vacíos o mal formados
-        if xb.ndim < 3 or xb.shape[0] == 0 or xb.shape[1] == 0 or xb.shape[2] == 0:
-            continue
         xb, yb = xb.to(device), yb.to(device)
         optimizer.zero_grad()
         out = model(xb)
@@ -68,7 +41,6 @@ for epoch in range(epochs):
         total_loss += loss.item()
         preds_all.append(out.detach().cpu().numpy())
         trues_all.append(yb.detach().cpu().numpy())
-
     avg_loss = total_loss / len(train_loader)
     preds_all = np.vstack(preds_all)
     trues_all = np.vstack(trues_all)
@@ -81,13 +53,10 @@ for epoch in range(epochs):
     preds_test, trues_test = [], []
     with torch.no_grad():
         for xb, yb in test_loader:
-            if xb.ndim < 3 or xb.shape[0] == 0 or xb.shape[1] == 0 or xb.shape[2] == 0:
-                continue
             xb, yb = xb.to(device), yb.to(device)
             output = model(xb)
             preds_test.append(output.cpu().numpy())
             trues_test.append(yb.cpu().numpy())
-
     preds_test = np.vstack(preds_test)
     trues_test = np.vstack(trues_test)
     preds_test_inv = scaler_y.inverse_transform(preds_test)
@@ -97,7 +66,6 @@ for epoch in range(epochs):
     train_losses.append(avg_loss)
     train_rmses.append(train_rmse)
     test_rmses.append(test_rmse)
-
     print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
 
 # Graficar métricas
