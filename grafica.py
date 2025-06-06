@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 # Cargar el dataset limpio
 df = pd.read_csv('Dataset/retail_store_inventory.csv')
 
-# Convertir la columna 'Date' a tipo fecha
+
 df['Date'] = pd.to_datetime(df['Date'])
 
-# Obtener lista de productos únicos
-productos = df['Product ID'].unique()[:1]
+
+productos = df['Product ID'].unique()[:1] #<- :1 significa solamente 1 producto (demasiadas graficas)
 
 # Crear una gráfica por producto
 for producto in productos:
@@ -17,7 +17,7 @@ for producto in productos:
     plt.figure(figsize=(14, 6))
     plt.title(f'Producto {producto} - Evolución de Variables en el Tiempo')
 
-    # Graficar cada variable en el mismo eje
+
     plt.plot(df_prod['Date'], df_prod['Inventory Level'], label='Inventario')
     plt.plot(df_prod['Date'], df_prod['Units Sold'], label='Unidades Vendidas')
     plt.plot(df_prod['Date'], df_prod['Price'], label='Precio')

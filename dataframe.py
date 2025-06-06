@@ -15,9 +15,8 @@ import pandas as pd
 
 # print("Files moved to workspace.")
 
-df = pd.read_csv("synthetic_inventory_data.csv")
+df = pd.read_csv("retail-store-inventory.csv")
 
-# Eliminar filas que no contengan y limpia las demás ciudades al solo querer bogotá.
 
 df_clean = df[['Date','Product ID','Inventory Level', 'Units Sold','Price']].dropna()
 
