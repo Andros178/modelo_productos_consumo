@@ -1,10 +1,10 @@
-from entrenar import model, scaler_x, scaler_y, seq_len, features, df, device
+from entrenar import model, scaler_x, scaler_y, seq_len, features, df, device, np, df
 
 def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
     producto_mask = df['Product ID'] == producto_id
     if not producto_mask.any():
         print(f"Producto {producto_id} no encontrado.")
-        return [], []
+        return np.array([]), None
     prod_encoded = df.loc[producto_mask, 'Product_encoded'].iloc[0]
     df_producto = df[df['Product_encoded'] == prod_encoded].copy()
     df_producto = df_producto.sort_values('Date')
