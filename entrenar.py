@@ -164,12 +164,18 @@ if __name__ == "__main__":
         # Fechas para el eje x
         fechas_futuras = pd.date_range(start=fecha_inicio, periods=paso, freq=frecuencia)
 
+        # Calcular la evolución del inventario restando las predicciones
+        inventario = [ultimo_inventory]
+        for pred in predicciones:
+            inventario.append(inventario[-1] - pred)
+        inventario = inventario[1:]  # Quitar el inventario inicial para alinear con fechas
+
         # Graficar
         import matplotlib.pyplot as plt
         plt.figure(figsize=(10, 5))
-        plt.plot(fechas_futuras, predicciones, marker='o', label='Predicción Units Sold')
-        plt.axhline(ultimo_inventory, color='red', linestyle='--', label='Inventory Level actual')
-        plt.title(f'Predicción de ventas futuras vs Inventory Level actual\nProducto: {producto_id}')
+        plt.bar(fechas_futuras, inventario, color='orange', alpha=0.6, label='Inventory Level proyectado')
+        plt.plot(fechas_futuras, predicciones, marker='o', color='blue', label='Predicción Units Sold')
+        plt.title(f'Predicción de ventas futuras y trazabilidad de inventario\nProducto: {producto_id}')
         plt.xlabel('Fecha')
         plt.ylabel('Unidades')
         plt.legend()
