@@ -15,10 +15,10 @@ import pandas as pd
 
 # print("Files moved to workspace.")
 
-df = pd.read_csv("retail-store-inventory.csv")
+df = pd.read_csv("retail_store_inventory.csv")
 
 
-df_clean = df[['Date','Product ID','Inventory Level', 'Units Sold','Price']].dropna()
+df_clean = df[['Product ID', 'Inventory Level', 'Units Sold', 'Date', 'Price','Discount', 'Holiday/Promotion']].dropna()
 
 df_clean.to_csv('Dataset/retail_store_inventory.csv', index=False)
 

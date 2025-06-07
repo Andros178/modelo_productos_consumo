@@ -24,7 +24,7 @@ model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss_fn = nn.MSELoss()
 
-epochs = 10
+epochs = 50
 train_losses, train_rmses, test_rmses = [], [], []
 
 for epoch in range(epochs):

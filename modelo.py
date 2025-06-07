@@ -59,8 +59,10 @@ le = LabelEncoder()
 df['Product_encoded'] = le.fit_transform(df['Product ID'])
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
+df['Holiday/Promotion'] = df['Holiday/Promotion'].astype(int)
+df['Discount'] = df['Discount'] / 100.0  # Si está en 0-100
 
-features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date']
+features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date', 'Price', 'Discount', 'Holiday/Promotion']
 target = ['Units Sold']
 
 scaler_x = MinMaxScaler()
