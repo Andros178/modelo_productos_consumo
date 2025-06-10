@@ -39,9 +39,9 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 
 # df = df.sort_values(by='fecha_Inicio')
 
-def modelar(df):
+def modelar(df,seq_len):
 
-    def create_sequences(X, y, seq_len=14):
+    def create_sequences(X, y, seq_len):
         Xs, ys = [], []
         for i in range(len(X) - seq_len):
             Xs.append(X[i:i+seq_len])
@@ -56,7 +56,7 @@ def modelar(df):
     #producto_id = "P0001"
 
     le = LabelEncoder()
-    df['Product_encoded'] = le.fit_transform(df['Producto ID'])
+    df['Product_encoded'] = le.fit_transform(df['Product ID'])
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
     #df['Holiday/Promotion'] = df['Holiday/Promotion'].astype(int)
@@ -75,7 +75,7 @@ def modelar(df):
         y_scaled = y_scaled.reshape(-1, 1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    seq_len = 14
+    
     train_size = int(len(df) * 0.82)
     X_train, X_test = X_scaled[:train_size], X_scaled[train_size:]
     y_train, y_test = y_scaled[:train_size], y_scaled[train_size:]
@@ -105,6 +105,7 @@ def modelar(df):
             x = self.transformer(x)
             out = self.fc(x[:, -1, :])
             return out
+    print(f"[modelo.py] Modelado completado. Tensores creados.")
 
     # (Opcional) Función para graficar la serie temporal
     def plot_delta(data):
