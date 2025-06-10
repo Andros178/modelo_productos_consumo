@@ -2,15 +2,13 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from modelo import TransformerModel, features, scaler_x, scaler_y, seq_len, df, device
 
-# Carga del modelo
-input_dim = len(features)
-model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
-model.load_state_dict(torch.load('Modelo.pth', map_location=device))
-model.eval()
 
-def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
+# Carga del modelo}
+
+
+
+def predecir_futuro_producto(df,producto_id, fecha_inicio, pasos, frecuencia, device, features, scaler_x, scaler_y,seq_len):
     producto_mask = df['Product ID'] == producto_id
     if not producto_mask.any():
         print(f"Producto {producto_id} no encontrado.")
@@ -25,7 +23,7 @@ def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
 
     import pandas as pd
     fecha_inicio_dt = pd.to_datetime(fecha_inicio)
-    fechas_futuras = pd.date_range(start=fecha_inicio_dt+pd.Timedelta(days=1), periods=pasos, freq=frecuencia)
+    fechas_futuras = pd.date_range(start=fecha_inicio_dt+pd.Timedelta(days=1), periods=paso, freq=frecuencia)
 
     predicciones = []
     for fecha in fechas_futuras:
@@ -43,7 +41,7 @@ def predecir_futuro_producto(producto_id, fecha_inicio, pasos, frecuencia):
 
     return np.array(predicciones), None
 
-from modelo import producto_id
+
 if __name__ == "__main__":
     from datetime import datetime, timedelta
     producto_id = "P0001"

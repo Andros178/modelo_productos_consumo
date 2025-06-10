@@ -53,7 +53,7 @@ def modelar(df,seq_len):
     # Dataset
 
 
-    producto_id = "1"
+    producto_id = 1
 
     le = LabelEncoder()
     df['Product_encoded'] = le.fit_transform(df['Product ID'])
