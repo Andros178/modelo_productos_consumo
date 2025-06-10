@@ -59,4 +59,3 @@ def conexion():
     except Exception as e:
         print("Ocurrió un error:", e)
         return None
-

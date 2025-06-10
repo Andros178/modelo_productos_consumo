@@ -53,7 +53,7 @@ def modelar(df,seq_len):
     # Dataset
 
 
-    #producto_id = "P0001"
+    producto_id = "1"
 
     le = LabelEncoder()
     df['Product_encoded'] = le.fit_transform(df['Product ID'])
@@ -62,9 +62,9 @@ def modelar(df,seq_len):
     #df['Holiday/Promotion'] = df['Holiday/Promotion'].astype(int)
     #df['Discount'] = df['Discount'] / 100.0  # Si está en 0-100
 
-    features = ['stock', 'Date']
+    features = ['stock', 'Date', 'Units Sold']
     # features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date', 'Price', 'Discount', 'Holiday/Promotion']
-    target = ['Date']
+    target = ['Units Sold']
     #target = ['Units Sold']
 
     scaler_x = MinMaxScaler()
@@ -89,22 +89,7 @@ def modelar(df,seq_len):
     X_test_tensor = torch.tensor(X_test_seq, dtype=torch.float32).to(device)
     y_test_tensor = torch.tensor(y_test_seq, dtype=torch.float32).to(device)
 
-    class TransformerModel(nn.Module):
-        def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
-            super().__init__()
-            self.input_proj = nn.Linear(input_dim, d_model)
-            self.positional_encoding = nn.Parameter(torch.randn(500, d_model))  # hasta 500 pasos
-            encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
-            self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-            self.fc = nn.Linear(d_model, 1)
-
-        def forward(self, x):
-            x = self.input_proj(x)
-            seq_len = x.shape[1]
-            x = x + self.positional_encoding[:seq_len]
-            x = self.transformer(x)
-            out = self.fc(x[:, -1, :])
-            return out
+    
     print(f"[modelo.py] Modelado completado. Tensores creados.")
 
     # (Opcional) Función para graficar la serie temporal
@@ -114,9 +99,25 @@ def modelar(df,seq_len):
         plt.show()
 
     # (Opcional) Función para crear secuencias manualmente (no necesaria si usas TimeseriesGenerator)
+    return features, scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df,seq_len, producto_id
 
+class TransformerModel(nn.Module):
+    def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
+        super().__init__()
+        self.input_proj = nn.Linear(input_dim, d_model)
+        self.positional_encoding = nn.Parameter(torch.randn(500, d_model))  # hasta 500 pasos
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.fc = nn.Linear(d_model, 1)
 
-    __all__ = [
-        "TransformerModel", "seq_len", "features", "target",
-        "scaler_x", "scaler_y", "X_train_tensor", "y_train_tensor", "X_test_tensor", "y_test_tensor", "device", "df"
-    ]
+    def forward(self, x):
+        x = self.input_proj(x)
+        seq_len = x.shape[1]
+        x = x + self.positional_encoding[:seq_len]
+        x = self.transformer(x)
+        out = self.fc(x[:, -1, :])
+        return out
+__all__ = [
+    "TransformerModel", "seq_len", "features", "target",
+    "scaler_x", "scaler_y", "X_train_tensor", "y_train_tensor", "X_test_tensor", "y_test_tensor", "device", "df"
+]

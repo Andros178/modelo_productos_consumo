@@ -37,7 +37,8 @@ def dataset(result_json):
         #'temporada_inicio': df_json['fechaHora_Inicio'],
         #'temporada_fin':df_json['fechaHora_Fin'],
         #'tipo_salida': df_json['tipo_salida'], # debe usarse one-hot encodding
-        'Date':df_json['fecha_registro']
+        'Date':df_json['fecha_registro'],
+        'Units Sold':df_json['venta']
     })
 
     print(df.head())
