@@ -1,17 +1,14 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from modelo import TransformerModel
+from app.services.modelo import TransformerModel
 import matplotlib.pyplot as plt
 import joblib
 import numpy as np
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 
-# Mostrar info de features [Depuracion]
 def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device):
-    #print("Features:", features)
-    #print("Primeras filas de df[features]:\n", df[features].head())
     print(f"Shape de X_train_tensor: {X_train_tensor.shape}")
     print(f"Shape de y_train_tensor: {y_train_tensor.shape}")
 
@@ -23,11 +20,11 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
 
     # Instanciar Modelo
     input_dim = X_train_tensor.shape[2]
-    model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
+    model = TransformerModel(input_dim=input_dim, d_model=640, nhead=40, num_layers=20).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
 
-    epochs = 100
+    epochs = 2000
 
     train_losses, train_rmses, test_rmses = [], [], []
 
@@ -97,7 +94,6 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
     joblib.dump(scaler_x, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')  # Guardar scaler_x
     joblib.dump(scaler_y, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')  # Guardar scaler_y
 
-
     # Evaluación final en test
     model.eval()
     preds, trues = [], []
@@ -116,3 +112,9 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
     trues_inv = scaler_y.inverse_transform(trues)
     rmse = np.sqrt(mean_squared_error(trues_inv, preds_inv))
     print(f"Test RMSE: {rmse:.2f}")
+
+    # Convertir las predicciones finales a una lista serializable
+    preds_inv = preds_inv.tolist()  # Convertir a lista
+    trues_inv = trues_inv.tolist()  # Convertir a lista
+
+    return {"predicciones": preds_inv, "valores_reales": trues_inv, "rmse": rmse}

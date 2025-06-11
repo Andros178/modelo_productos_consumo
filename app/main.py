@@ -1,25 +1,40 @@
+# main.py
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-import pandas as pd
-import os
+from app.routes import train_model, predict_model
+from pydantic import BaseModel
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"message": "API funcionando"}
+class Request(BaseModel):
+    seq_len: int
+    frecuencia: str
+    producto_id: int
+    paso: int
+    features: str
+    target: str
+    fecha_inicio: str
 
-@app.get("/resultado/{product_id}")
-def get_by_product(product_id: str):
-    try:
-        df = pd.read_csv("Dataset/retail_store_inventory11.csv")
-        df = df[df["producto ID"] == product_id]
 
-        if df.empty:
-            return JSONResponse(status_code=404, content={"error": "Producto no encontrado"})
 
-        return df.to_dict(orient="records")
+@app.post("/train_model")
+async def train(request: Request):
+    # Extraer los datos del objeto
+    return await train_model(
+        request.seq_len, request.frecuencia, request.producto_id,
+        request.paso, request.features, request.target, request.fecha_inicio
+    )
+@app.post("/predict_model")
+async def predict(request: Request):
+    print("Datos recibidos:", request.dict())
+    return await predict_model(
+        frecuencia=request.frecuencia,
+        paso=request.paso,
+        producto_id=request.producto_id,
+        fecha_inicio=request.fecha_inicio,
+        seq_len=request.seq_len,
+        features=request.features,
+        target=request.target
+)
 
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+
 

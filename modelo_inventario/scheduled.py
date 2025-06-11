@@ -46,18 +46,6 @@ print(f"Usando fecha inicio = {fecha_inicio}")
 
 
 
-
-try: 
-    # Inicializar dispositivo (CPU o GPU)
-    
-
-    # Cargar los scalers previamente guardados
-    scaler_x = joblib.load('scaler/scaler_x.pkl')  # Cargar scaler_x
-    scaler_y = joblib.load('scaler/scaler_y.pkl')  # Cargar scaler_y
-except:
-    print(f"No se encontraron scalers o modelo para predicción sin entrenamiento")
-
-
 result_json = conexion()
 if result_json:
     df =  dataset(result_json)

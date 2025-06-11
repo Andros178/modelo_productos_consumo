@@ -12,33 +12,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 
 
-# json_data = [
-#       {"Date": "2022-01-01", "Product ID": "P0001", "Inventory Level": 231, "Units Sold": 127, "Units Ordered": 55, "Demand Forecast": 135.47, "Price": 33.5},
-#       {"Date": "2022-01-02", "Product ID": "P0001", "Inventory Level": 220, "Units Sold": 130, "Units Ordered": 60, "Demand Forecast": 138.70, "Price": 34.0},
-#      # ... más registros
-#   ]
-
-# json_data = "" #Se obtiene con la peticion a backend
-
-# #Convertir a DataFrame
-# df_json = pd.DataFrame(json_data)
-
-# #Crear nuevo DataFrame con columnas seleccionadas
-# df = pd.DataFrame({
-#      'cantidad_salida': df_json['Units Sold'],  # o 'Demand Forecast' si prefieres usar el pronóstico
-#      'producto': df_json['Product ID'],
-#      'stock': df_json['Inventory Level'],
-#      'temporada_inicio': df_json['fechaHora_Inicio'],
-#      'temporada_fin':df_json['fechaHora_Fin'],
-#      'tipo_salida': df_json['tipo_salida'], # debe usarse one-hot encodding
-#      })
-
-# print(df.head())
-
-
-
-# df = df.sort_values(by='fecha_Inicio')
-
 def modelar(df,seq_len,features, target):
 
     def create_sequences(X, y, seq_len):
@@ -62,13 +35,7 @@ def modelar(df,seq_len,features, target):
     df['Product_encoded'] = le.fit_transform(df['Product ID'])
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
-    #df['Holiday/Promotion'] = df['Holiday/Promotion'].astype(int)
-    #df['Discount'] = df['Discount'] / 100.0  # Si está en 0-100
-
-    #features = ['stock', 'Date', 'Units Sold']
-    # features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date', 'Price', 'Discount', 'Holiday/Promotion']
-    #target = ['Units Sold']
-    #target = ['Units Sold']
+    
 
     scaler_x = MinMaxScaler()
     scaler_y = MinMaxScaler()
@@ -123,7 +90,7 @@ def modelar(df,seq_len,features, target):
     return  scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
+    def __init__(self, input_dim, d_model=640, nhead=40, num_layers=20):
         super().__init__()
         self.input_proj = nn.Linear(input_dim, d_model)
         self.positional_encoding = nn.Parameter(torch.randn(500, d_model))  # hasta 500 pasos

@@ -2,16 +2,17 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import joblib
-from modelo import TransformerModel
+from app.services.modelo import TransformerModel
 from sklearn.preprocessing import LabelEncoder
 
 le = LabelEncoder()
 
 def predecir_futuro_producto(frecuencia, paso, producto_id, df, fecha_inicio, seq_len, features,target):
+    
     import pandas as pd
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_dim = len(features)
-    model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
+    model = TransformerModel(input_dim=input_dim, d_model=640, nhead=40, num_layers=20).to(device)
     # Cargar pesos entrenados
     model.load_state_dict(torch.load("/home/usco/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth", map_location=device))
     model.eval()
