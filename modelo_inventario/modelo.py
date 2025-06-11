@@ -39,7 +39,7 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 
 # df = df.sort_values(by='fecha_Inicio')
 
-def modelar(df,seq_len):
+def modelar(df,seq_len,features, target):
 
     def create_sequences(X, y, seq_len):
         Xs, ys = [], []
@@ -49,22 +49,25 @@ def modelar(df,seq_len):
         return np.array(Xs), np.array(ys)
 
 
-
+    
     # Dataset
 
 
-    producto_id = 1
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     le = LabelEncoder()
+    print(f"Tipo de objeto en df['Product ID']: {type(df['Product ID'])}")
+    print(f"Dispositivo: {device}")
+
     df['Product_encoded'] = le.fit_transform(df['Product ID'])
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
     #df['Holiday/Promotion'] = df['Holiday/Promotion'].astype(int)
     #df['Discount'] = df['Discount'] / 100.0  # Si está en 0-100
 
-    features = ['stock', 'Date', 'Units Sold']
+    #features = ['stock', 'Date', 'Units Sold']
     # features = ['Product_encoded', 'Inventory Level', 'Units Sold', 'Date', 'Price', 'Discount', 'Holiday/Promotion']
-    target = ['Units Sold']
+    #target = ['Units Sold']
     #target = ['Units Sold']
 
     scaler_x = MinMaxScaler()
@@ -74,15 +77,33 @@ def modelar(df,seq_len):
     if y_scaled.ndim == 1:
         y_scaled = y_scaled.reshape(-1, 1)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     
     train_size = int(len(df) * 0.82)
     X_train, X_test = X_scaled[:train_size], X_scaled[train_size:]
     y_train, y_test = y_scaled[:train_size], y_scaled[train_size:]
 
+    if len(X_train) <= seq_len or len(X_test) <= seq_len:
+        raise ValueError(f"El tamaño de los datos de entrenamiento ({len(X_train)}) o test ({len(X_test)}) es menor o igual a seq_len ({seq_len}). Reduce seq_len o usa más datos.", print(df.head(30)))    
+    
     # Crear secuencias manualmente
     X_train_seq, y_train_seq = create_sequences(X_train, y_train, seq_len)
     X_test_seq, y_test_seq = create_sequences(X_test, y_test, seq_len)
+
+    print("X_train_seq shape:", X_train_seq.shape)
+    print("y_train_seq shape:", y_train_seq.shape)
+
+
+    print("X_train_seq shape:", X_train_seq.shape)
+    print("y_train_seq shape:", y_train_seq.shape)
+    print("X_test_seq shape:", X_test_seq.shape)
+    print("y_test_seq shape:", y_test_seq.shape)
+
+
+    if X_train_seq.shape[0] != y_train_seq.shape[0]:
+        raise ValueError(f"X_train_seq y y_train_seq tienen diferente número de muestras: {X_train_seq.shape[0]} vs {y_train_seq.shape[0]}")
+    if X_test_seq.shape[0] != y_test_seq.shape[0]:
+        raise ValueError(f"X_test_seq y y_test_seq tienen diferente número de muestras: {X_test_seq.shape[0]} vs {y_test_seq.shape[0]}")
 
     X_train_tensor = torch.tensor(X_train_seq, dtype=torch.float32).to(device)
     y_train_tensor = torch.tensor(y_train_seq, dtype=torch.float32).to(device)
@@ -90,7 +111,7 @@ def modelar(df,seq_len):
     y_test_tensor = torch.tensor(y_test_seq, dtype=torch.float32).to(device)
 
     
-    print(f"[modelo.py] Modelado completado. Tensores creados.")
+    #print(f"[modelo.py] Modelado completado. Tensores creados.")
 
     # (Opcional) Función para graficar la serie temporal
     def plot_delta(data):
@@ -99,7 +120,7 @@ def modelar(df,seq_len):
         plt.show()
 
     # (Opcional) Función para crear secuencias manualmente (no necesaria si usas TimeseriesGenerator)
-    return features, scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df,seq_len, producto_id
+    return  scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df
 
 class TransformerModel(nn.Module):
     def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
@@ -117,6 +138,8 @@ class TransformerModel(nn.Module):
         x = self.transformer(x)
         out = self.fc(x[:, -1, :])
         return out
+    
+
 __all__ = [
     "TransformerModel", "seq_len", "features", "target",
     "scaler_x", "scaler_y", "X_train_tensor", "y_train_tensor", "X_test_tensor", "y_test_tensor", "device", "df"
