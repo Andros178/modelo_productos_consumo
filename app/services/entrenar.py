@@ -20,14 +20,14 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
 
     # Instanciar Modelo
     input_dim = X_train_tensor.shape[2]
-    model = TransformerModel(input_dim=input_dim, d_model=640, nhead=40, num_layers=20).to(device)
+    model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
 
-    epochs = 2000
+    epochs = 1
 
     train_losses, train_rmses, test_rmses = [], [], []
-
+    history = {"epoch": [], "train_loss": [], "test_loss": []}
     for epoch in range(epochs):
         model.train()
         total_loss = 0
@@ -69,30 +69,17 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
         test_rmses.append(test_rmse)
         print(f"Epoch {epoch+1}/{epochs} | Train Loss: {avg_loss:.4f} | Train RMSE: {train_rmse:.2f} | Test RMSE: {test_rmse:.2f}")
 
-    # Graficar métricas
-    epochs_range = range(1, epochs + 1)
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 3, 1)
-    plt.plot(epochs_range, train_losses, marker='o', color='blue')
-    plt.title('Train Loss por Epoch')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.subplot(1, 3, 2)
-    plt.plot(epochs_range, train_rmses, marker='o', color='green')
-    plt.title('Train RMSE por Epoch')
-    plt.xlabel('Epoch')
-    plt.ylabel('RMSE')
-    plt.subplot(1, 3, 3)
-    plt.plot(epochs_range, test_rmses, marker='o', color='red')
-    plt.title('Test RMSE por Epoch')
-    plt.xlabel('Epoch')
-    plt.ylabel('RMSE')
-    plt.tight_layout()
-    plt.show()
+    history = {
+    "epochs": list(range(1, epochs + 1)),
+    "train_loss": train_losses,
+    "train_rmse": train_rmses,
+    "test_rmse": test_rmses
+    }
 
-    torch.save(model.state_dict(), '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth')
-    joblib.dump(scaler_x, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')  # Guardar scaler_x
-    joblib.dump(scaler_y, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')  # Guardar scaler_y
+
+    torch.save(model.state_dict(), '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth')
+    joblib.dump(scaler_x, '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')  # Guardar scaler_x
+    joblib.dump(scaler_y, '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')  # Guardar scaler_y
 
     # Evaluación final en test
     model.eval()
@@ -117,4 +104,10 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
     preds_inv = preds_inv.tolist()  # Convertir a lista
     trues_inv = trues_inv.tolist()  # Convertir a lista
 
-    return {"predicciones": preds_inv, "valores_reales": trues_inv, "rmse": rmse}
+    return {
+    "predicciones": preds_inv,
+    "valores_reales": trues_inv,
+    "rmse": rmse,
+    "history": history
+    }
+

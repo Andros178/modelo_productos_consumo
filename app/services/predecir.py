@@ -12,13 +12,13 @@ def predecir_futuro_producto(frecuencia, paso, producto_id, df, fecha_inicio, se
     import pandas as pd
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_dim = len(features)
-    model = TransformerModel(input_dim=input_dim, d_model=640, nhead=40, num_layers=20).to(device)
+    model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
     # Cargar pesos entrenados
-    model.load_state_dict(torch.load("/home/usco/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth", map_location=device))
+    model.load_state_dict(torch.load("/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth", map_location=device))
     model.eval()
 
-    scaler_x = joblib.load('/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')
-    scaler_y = joblib.load('/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')
+    scaler_x = joblib.load('/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')
+    scaler_y = joblib.load('/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')
 
     # Codificar producto
     df['Product_encoded'] = le.fit_transform(df['Product ID'])
@@ -61,103 +61,39 @@ def predecir_futuro_producto(frecuencia, paso, producto_id, df, fecha_inicio, se
 
     return np.array(predicciones), fechas_futuras
 
-def graficar_prediccion(frecuencia, paso, producto_id, df, predicciones, fecha_inicio, seq_len, features,target):
+def calcular_proyeccion_inventario(predicciones, df, producto_id, fecha_inicio, paso, frecuencia, umbral=10):
     import pandas as pd
-    from datetime import timedelta
-
-    if predicciones is None or len(predicciones) == 0:
-        print("No hay predicciones para graficar.")
-        return
-
-    # Obtener el último Inventory Level real del producto
-    df_producto = df[df['Product ID'] == producto_id].copy()
-    df_producto = df_producto.sort_values('Date')
-
-    # Convertir Date a timestamp si es string
-    if df_producto['Date'].dtype == object or str(df_producto['Date'].dtype).startswith('datetime'):
-        df_producto['Date'] = pd.to_datetime(df_producto['Date'], errors='coerce')
-        df_producto['Date'] = df_producto['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
-
-    tolerancia = 1
     fecha_inicio_dt = pd.to_datetime(fecha_inicio)
-    fecha_ts = fecha_inicio_dt.timestamp()
-    if df['Date'].dtype == object or str(df['Date'].dtype).startswith('datetime'):
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df['Date'] = df['Date'].map(lambda x: x.timestamp() if pd.notnull(x) else 0)
-    mask = (
-        (df['Product ID'] == producto_id) &
-        (df['Date'] >= fecha_ts - tolerancia) &
-        (df['Date'] <= fecha_ts + tolerancia)
-    )
-    ultimo_stock = df.loc[mask, 'stock']
-    if not ultimo_stock.empty:
-        ultimo_stock = float(ultimo_stock.iloc[0])
-    else:
-        ultimo_stock = 0.0
-
-    # Fechas futuras para graficar
     fechas_futuras = pd.date_range(start=fecha_inicio_dt, periods=paso, freq=frecuencia)
 
-    # Calcular la evolución del inventario restando las predicciones
+    df = df.copy()
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    ultimo_stock = df.loc[
+        (df['Product ID'] == producto_id) & (df['Date'] == fecha_inicio_dt),
+        'stock'
+    ]
+    ultimo_stock = float(ultimo_stock.iloc[0]) if not ultimo_stock.empty else 0.0
+
     inventario = [ultimo_stock]
     necesidad = []
-    umbral = 10
-    notificado = False
     alerta_fecha = None
-    print("Tipo de predicciones:", type(predicciones))
-    print("Ejemplo de predicciones:", predicciones[:5])
+    notificado = False
+
     for fecha, pred in zip(fechas_futuras, predicciones):
-    # Solo procesa si pred es un número
-        if isinstance(pred, (np.ndarray, list, pd.Series)):
-            pred_val = float(np.ravel(pred)[0])
-        elif isinstance(pred, (int, float, np.integer, np.floating)):
-            pred_val = float(pred)
-        else:
-            print(f"Predicción inválida para la fecha {fecha}: {pred} (tipo {type(pred)})")
-            continue  # Salta este ciclo si no es válido
+        pred_val = float(np.ravel(pred)[0]) if isinstance(pred, (np.ndarray, list, pd.Series)) else float(pred)
         nuevo_inv = float(inventario[-1]) - pred_val
         sobrante = nuevo_inv - umbral
         inventario.append(nuevo_inv)
-        if sobrante > 0:
-            necesidad.append(0)
-        else:
-            necesidad.append(sobrante)
+        necesidad.append(sobrante if sobrante < 0 else 0)
         if not notificado and nuevo_inv <= umbral:
-            print(f"¡ALERTA! El {fecha.strftime('%Y-%m-%d')} el inventario proyectado baja al umbral ({nuevo_inv:.0f} unidades). ¡Debe reabastecer!")
-            alerta_fecha = fecha
+            alerta_fecha = fecha.strftime("%Y-%m-%d")
             notificado = True
 
-    # Para graficar, las fechas deben tener la misma longitud que inventario
-    fechas_graf = [fechas_futuras[0] - pd.Timedelta(days=1)] + list(fechas_futuras)
-
-    plt.figure(figsize=(12, 6))
-    plt.bar(fechas_graf, inventario, color='orange', alpha=0.6, label=f'{target} Level proyectado')
-    plt.title(f'Inventario proyectado - Producto: {producto_id}')
-    plt.xlabel('Fecha')
-    plt.ylabel('Unidades')
-    plt.grid(True)
-    plt.legend()
-    for fecha, valor in zip(fechas_graf, inventario):
-        plt.text(fecha, valor, f'{valor:.0f}', ha='center', va='bottom', fontsize=9, color='black', fontweight='bold')
-    if alerta_fecha is not None:
-        plt.axvline(alerta_fecha, color='red', linestyle='--', linewidth=2, label='Fecha de alerta')
-        plt.legend()
-    plt.show()
-
-    # Gráfica de predicción de ventas y necesidad
-    plt.figure(figsize=(12, 6))
-    plt.bar(fechas_futuras, predicciones, color='blue', alpha=0.6, label=f'Predicción {target}')
-    plt.bar(fechas_futuras, necesidad, color='red', alpha=0.4, label='Necesidad (faltante)', bottom=0)
-    plt.title(f'Predicción de ventas y necesidad - Producto: {producto_id}')
-    plt.xlabel('Fecha')
-    plt.ylabel('Unidades')
-    plt.grid(True)
-    plt.legend()
-    for fecha, val_pred, val_nec in zip(fechas_futuras, predicciones, necesidad):
-        plt.text(fecha, val_pred, f'{val_pred:.0f}', ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
-        if val_nec != 0:
-            plt.text(fecha, val_nec, f'{val_nec:.0f}', ha='center', va='top', fontsize=9, color='red', fontweight='bold')
-    if alerta_fecha is not None:
-        plt.axvline(alerta_fecha, color='red', linestyle='--', linewidth=2, label='Fecha de alerta')
-        plt.legend()
-    plt.show()
+    return {
+        "fechas": [d.strftime("%Y-%m-%d") for d in fechas_futuras],
+        "predicciones": [float(p) for p in predicciones],
+        "inventario": inventario[1:],  # eliminar el stock inicial
+        "necesidad": necesidad,
+        "umbral": umbral,
+        "alerta_fecha": alerta_fecha
+    }

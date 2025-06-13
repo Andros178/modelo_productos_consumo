@@ -1,5 +1,6 @@
 # main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import train_model, predict_model
 from pydantic import BaseModel
 
@@ -14,6 +15,13 @@ class Request(BaseModel):
     target: str
     fecha_inicio: str
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],  # Ajusta al host de tu frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/train_model")

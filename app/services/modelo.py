@@ -90,7 +90,7 @@ def modelar(df,seq_len,features, target):
     return  scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_dim, d_model=640, nhead=40, num_layers=20):
+    def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2):
         super().__init__()
         self.input_proj = nn.Linear(input_dim, d_model)
         self.positional_encoding = nn.Parameter(torch.randn(500, d_model))  # hasta 500 pasos
