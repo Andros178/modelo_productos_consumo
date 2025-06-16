@@ -2,23 +2,24 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import joblib
-from app.services.modelo import TransformerModel
+from app.services.inventario.modelo import TransformerModel
 from sklearn.preprocessing import LabelEncoder
 
 le = LabelEncoder()
 
 def predecir_futuro_producto(frecuencia, paso, producto_id, df, fecha_inicio, seq_len, features,target):
-    
+    le = joblib.load("/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/label_encoder.pkl")
+
     import pandas as pd
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_dim = len(features)
     model = TransformerModel(input_dim=input_dim, d_model=64, nhead=4, num_layers=2).to(device)
     # Cargar pesos entrenados
-    model.load_state_dict(torch.load("/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth", map_location=device))
+    model.load_state_dict(torch.load("/home/usco/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth", map_location=device))
     model.eval()
 
-    scaler_x = joblib.load('/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')
-    scaler_y = joblib.load('/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')
+    scaler_x = joblib.load('/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')
+    scaler_y = joblib.load('/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')
 
     # Codificar producto
     df['Product_encoded'] = le.fit_transform(df['Product ID'])

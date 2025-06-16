@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from app.services.modelo import TransformerModel
+from app.services.inventario.modelo import TransformerModel
 import matplotlib.pyplot as plt
 import joblib
 import numpy as np
@@ -24,7 +24,7 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
 
-    epochs = 1
+    epochs = 1000   
 
     train_losses, train_rmses, test_rmses = [], [], []
     history = {"epoch": [], "train_loss": [], "test_loss": []}
@@ -77,10 +77,10 @@ def entrenar(scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, 
     }
 
 
-    torch.save(model.state_dict(), '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth')
-    joblib.dump(scaler_x, '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')  # Guardar scaler_x
-    joblib.dump(scaler_y, '/home/ubuntuandros/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')  # Guardar scaler_y
-
+    torch.save(model.state_dict(), '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/modelo/Modelo.pth')
+    joblib.dump(scaler_x, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_x.pkl')  # Guardar scaler_x
+    joblib.dump(scaler_y, '/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/scaler_y.pkl')  # Guardar scaler_y
+    
     # Evaluación final en test
     model.eval()
     preds, trues = [], []

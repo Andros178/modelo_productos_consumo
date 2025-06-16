@@ -10,7 +10,7 @@ import math
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
-
+import joblib
 
 def modelar(df,seq_len,features, target):
 
@@ -39,8 +39,10 @@ def modelar(df,seq_len,features, target):
 
     scaler_x = MinMaxScaler()
     scaler_y = MinMaxScaler()
+
     X_scaled = scaler_x.fit_transform(df[features])
-    y_scaled = scaler_y.fit_transform(df[target])
+    y_scaled = scaler_y.fit_transform(df[[target]])  # ← CORREGIDO
+
     if y_scaled.ndim == 1:
         y_scaled = y_scaled.reshape(-1, 1)
 
@@ -85,6 +87,7 @@ def modelar(df,seq_len,features, target):
         plt.plot(data)
         plt.ylabel('Delta')
         plt.show()
+    joblib.dump(le, "/home/usco/Documents/modelo_productos_consumo/modelo_inventario/scaler/label_encoder.pkl")
 
     # (Opcional) Función para crear secuencias manualmente (no necesaria si usas TimeseriesGenerator)
     return  scaler_x, scaler_y, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, device, df
